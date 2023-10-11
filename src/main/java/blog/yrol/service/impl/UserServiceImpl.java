@@ -2,6 +2,7 @@ package blog.yrol.service.impl;
 
 import blog.yrol.entity.User;
 import blog.yrol.repository.UserRepository;
+import blog.yrol.service.EmailVerificationService;
 import blog.yrol.service.UserService;
 import blog.yrol.service.UserServiceException;
 
@@ -10,6 +11,12 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
 
     UserRepository userRepository;
+    EmailVerificationService emailVerificationService;
+
+    public UserServiceImpl(UserRepository userRepository, EmailVerificationService emailVerificationService) {
+        this.userRepository = userRepository;
+        this.emailVerificationService = emailVerificationService;
+    }
 
     @Override
     public User createUser(String firstName, String lastName, String email, String password, String reTypePassword) throws IllegalArgumentException {
@@ -33,6 +40,12 @@ public class UserServiceImpl implements UserService {
         }
 
         if(!isUserCreated) throw new UserServiceException("Couldn't create user");
+
+        try {
+            emailVerificationService.scheduleEmailConfirmation(user);
+        } catch (RuntimeException ex) {
+            throw new UserServiceException(ex.getMessage());
+        }
         
         return user;
     }

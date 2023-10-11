@@ -1,7 +1,10 @@
 import blog.yrol.entity.User;
 import blog.yrol.repository.UserRepository;
+import blog.yrol.service.EmailNotificationException;
+import blog.yrol.service.EmailVerificationService;
 import blog.yrol.service.UserService;
 import blog.yrol.service.UserServiceException;
+import blog.yrol.service.impl.EmailVerificationServiceImpl;
 import blog.yrol.service.impl.UserServiceImpl;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,7 +17,8 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.*;
 
 
 @ExtendWith(MockitoExtension.class)
@@ -22,15 +26,19 @@ public class UserServiceTest {
 
     /**
      * Adding UserServiceImpl and allowing mock object to be added to it.
-     * **/
+     **/
     @InjectMocks
     UserServiceImpl userService;
 
     /**
      * Adding UserRepository mock object
-     * **/
+     **/
     @Mock
     UserRepository userRepository;
+
+    @Mock
+    EmailVerificationServiceImpl emailVerificationService;
+
     String firstName;
     String lastName;
     String email;
@@ -67,7 +75,7 @@ public class UserServiceTest {
         assertEquals("yrol@test.com", user.getEmail(), "User email does not match.");
 
         /**
-         * Making the sure the userRepository.save() method was called exactly one time (although we don't test this code as mentioned above)
+         * Making the sure the userRepository.save() method will be called in a real scenario, although it won't be executed / run during test run (since only mocking)
          * **/
         Mockito.verify(userRepository, Mockito.times(1)).save(Mockito.any(User.class));
     }
@@ -87,8 +95,8 @@ public class UserServiceTest {
     }
 
     /**
-     * Exception stubbing
-     * **/
+     * Exception stubbing for UerService createUser()
+     **/
     @DisplayName("If save() method causes RuntimeException, a UserServiceException is thrown")
     @Test
     void testCreateUser_whenSaveMethodThrowsException_thenThrowsUserServiceException() {
@@ -98,8 +106,87 @@ public class UserServiceTest {
          * **/
         when(userRepository.save(Mockito.any(User.class))).thenThrow(RuntimeException.class);
 
-        assertThrows(UserServiceException.class, ()-> {
+        assertThrows(UserServiceException.class, () -> {
             userService.createUser(firstName, lastName, email, password, reTypePassword);
         }, "Should have thrown UserServiceException instead");
+    }
+
+    /**
+     * Testing void methods using Mockito -  emailVerificationService.scheduleEmailConfirmation(user);
+     **/
+    @DisplayName("EmailNotificationException is handled")
+    @Test
+    void testCreateUser_whenEmailNotificationExceptionThrown_thenThrowsUserServiceException() {
+
+        /**
+         * Non-void userRepository.save
+         * **/
+        when(userRepository.save(Mockito.any(User.class))).thenReturn(true);
+
+        /**
+         * Handling the void method
+         * **/
+        //when(emailVerificationService.scheduleEmailConfirmation(Mockito.any(User.class))).thenThrow(EmailNotificationException.class); // Won't work as in void method
+
+        // Mocking the emailVerificationService to throw EmailNotificationException
+        doThrow(EmailNotificationException.class)
+                .when(emailVerificationService)
+                .scheduleEmailConfirmation(Mockito.any(User.class));
+
+        assertThrows(UserServiceException.class, () -> {
+            userService.createUser(firstName, lastName, email, password, reTypePassword);
+        });
+    }
+
+    /**
+     * Avoiding the void methods after invoke -  emailVerificationService.scheduleEmailConfirmation(user);
+     **/
+    @DisplayName("Avoiding EmailNotification when invoked")
+    @Test
+    void testCreateUser_whenEmailNotification_thenReturnsUserObject() {
+
+        /**
+         * Mocking Non-void userRepository.save
+         * **/
+        when(userRepository.save(Mockito.any(User.class))).thenReturn(true);
+
+        /**
+         * Handling the void method
+         * **/
+        //when(emailVerificationService.scheduleEmailConfirmation(Mockito.any(User.class))).thenThrow(EmailNotificationException.class); // Won't work as in void method
+
+        // Mocking the emailVerificationService and do nothing
+        doNothing().when(emailVerificationService).scheduleEmailConfirmation(Mockito.any(User.class));
+
+        /**
+         * Calling the userService.createUser
+         * **/
+        userService.createUser(firstName, lastName, email, password, reTypePassword);
+        Mockito.verify(userRepository, Mockito.times(1)).save(Mockito.any(User.class));
+    }
+
+    /**
+     * Executing dependency methods EmailVerificationService
+     * **/
+    @DisplayName("EmailVerificationService is executed")
+    @Test
+    void testCreateUser_whenUserCreated_scheduleEmailConfirmation() {
+        /**
+         * Mocking Non-void userRepository.save
+         * **/
+        when(userRepository.save(Mockito.any(User.class))).thenReturn(true);
+
+        /**
+         * Invoking /  calling the method without mocking
+         * **/
+        Mockito.doCallRealMethod().when(emailVerificationService).
+                scheduleEmailConfirmation(Mockito.any(User.class));
+
+        userService.createUser(firstName, lastName, email, password, reTypePassword);
+
+        /**
+         * Making sure scheduleEmailConfirmation() is called once
+         * **/
+        verify(emailVerificationService, atLeast(1)).scheduleEmailConfirmation(any(User.class));
     }
 }
