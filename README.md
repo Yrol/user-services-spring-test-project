@@ -1,5 +1,5 @@
-# Spring Boot test project
-A playground project created using Spring boot to explore the following test related core features.
+# Spring Boot test playground project
+A playground project created using Spring boot to explore the following test related core features (defined in `src/test/java/UserServiceTest.java`).
 - Assertions
 - Mocking objects / dependencies via Mokito
   - Mocking return methods: `Mockito.when`
